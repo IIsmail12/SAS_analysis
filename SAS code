@@ -86,6 +86,10 @@ run;
 proc print data=work.survey_clean(obs=5);
 run;
 
+/* ================================================================================= */
+/* STEP 3: GRAPHICS DESCRIPTIVE ANALYSIS                                      */
+/* ================================================================================= */
+
 ods graphics / reset width=6.4in height=4.8in imagemap;
 
 proc sort data=WORK.SURVEY_CLEAN out=_HistogramTaskData;
@@ -125,4 +129,6 @@ ods graphics / reset width=6.4in height=4.8in imagemap;
 proc sort data=WORK.SURVEY_CLEAN out=_HistogramTaskData;
 	by age_group;
 run;
+
+
 
