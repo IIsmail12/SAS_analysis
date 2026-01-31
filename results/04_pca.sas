@@ -1,16 +1,8 @@
-
-proc princomp data=work.survey
-              out=work.pca_scores
-              plots=none; #add diagram later
-                
-    #brain storm labels             
-    var autonomy_learning
-        intrinsic_motivation
-        syllabus_preference
-        visual_learning
-        digital_tools_comfort
-        social_learning
-        peer_exchange;
+proc princomp data=work.survey_clean
+              out=pca_scores
+              plots= all;
+    var Q1_Explore Q2_need_learn Q3_syllabus
+        Q4_graphs Q5_AI Q6_discuss Q7_share;
 run;
 
 

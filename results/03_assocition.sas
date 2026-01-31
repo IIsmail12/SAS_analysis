@@ -1,0 +1,14 @@
+proc freq data=work.survey_clean;
+    tables gender * tool_ai / chisq expected;
+run;
+proc freq data=work.survey_clean;
+    tables current_situation * tool_ai / chisq expected;
+run;
+data survey_assoc;
+    set work.survey_clean;
+    if Q4_graphs >= 5 then visual_pref = "High";
+    else visual_pref = "Low/Medium";
+run;
+proc freq data=survey_assoc;
+    tables education_level * visual_pref / chisq expected;
+run;
