@@ -70,6 +70,17 @@ data work.survey_clean;
 	        Q7_share        = "I frequently share notes with others"
 	        Q8_satisfaction = "Overall satisfaction with current habits"
 	        studies_binary = "Studied in the last 2 years (Binary)";
+	        
+    length hobby_short $16;
+    select(hobby);
+        when("Creative Arts") hobby_short="Arts";
+        when("Physical Activity/Sports") hobby_short="Sports";
+        when("Reading") hobby_short="Reading";
+        when("Socializing/Volunteering") hobby_short="Social";
+        when ("Strategic Gaming (Board games, video games, or puzzles)") hobby_short="Gaming";
+        when("Technical/DIY Projects (coding, gaming, exploring new apps)") hobby_short="DIY";
+        otherwise hobby_short=hobby;
+    end;
     
 /***Assign format to Y/N questions;
     format studies_binary tool_ai tool_org tool_video tool_books tool_online 
@@ -90,45 +101,84 @@ run;
 /* STEP 3: GRAPHICS DESCRIPTIVE ANALYSIS                                      */
 /* ================================================================================= */
 
-ods graphics / reset width=6.4in height=4.8in imagemap;
+title "Descriptive Analysis";
+proc freq data=work.survey_clean;
+tables gender / out=f_gender;
+tables age_group / out=f_age;
+tables education_level / out=f_edu;
+tables current_situation / out=f_sit;
+tables study_time_pref / out=f_stu_pref;
+tables Hobby / out=f_hobby;
+tables Techniques / out=f_tech;
+tables Tools / out=f_too;
+run;
+title;
 
-proc sort data=WORK.SURVEY_CLEAN out=_HistogramTaskData;
-	by Gender;
+proc sgplot data=work.survey_clean;
+    vbar gender / stat=percent datalabel;
+    title "Gender";
+    xaxis label="Gender";
+    yaxis label="(%)";
 run;
 
-ods noproctitle;
-ods graphics / imagemap=on;
-
-proc means data=WORK.SURVEY_CLEAN chartype mean std min max n vardef=df;
-	var Q1_Explore Q2_need_learn Q3_syllabus Q4_graphs Q5_AI Q6_discuss Q7_share 
-		Q8_satisfaction;
+proc sgplot data=work.survey_clean;
+    vbar age_group / stat=percent datalabel;
+    title "Age group";
+    xaxis label="Age";
+    yaxis label="(%)";
 run;
 
-ods noproctitle;
-ods graphics / imagemap=on;
-
-ods graphics / reset width=6.4in height=4.8in imagemap;
-
-proc sgplot data=WORK.SURVEY_CLEAN;
-	vbar current_situation /;
-	yaxis grid;
+proc sgplot data=work.survey_clean;
+    vbar education_level / stat=percent datalabel;
+    title "Education level";
+    xaxis label="Level";
+    yaxis label="(%)";
 run;
 
-ods graphics / reset;
-
-proc sgplot data=_HistogramTaskData;
-	by Gender;
-	histogram Q5_AI /;
-	yaxis grid;
+proc sgplot data=work.survey_clean;
+    vbar current_situation / stat=percent datalabel;
+    title "Current situation";
+    xaxis label="Situation";
+    yaxis label="(%)";
 run;
 
-ods graphics / reset;
-
-ods graphics / reset width=6.4in height=4.8in imagemap;
-
-proc sort data=WORK.SURVEY_CLEAN out=_HistogramTaskData;
-	by age_group;
+proc sgplot data=work.survey_clean;
+    vbar study_time_pref / stat=percent datalabel;
+    title "Study time preferences";
+    xaxis label="Time";
+    yaxis label="(%)";
 run;
 
+proc sgplot data=work.survey_clean;
+    vbar hobby_short / stat=percent datalabel;
+    title "Hobby preferences";
+    xaxis label="Hobby";
+    yaxis label="(%)";
+run;
 
+proc sgplot data=work.survey_clean;
+    vbar Techniques / stat=percent datalabel;
+    title "Learning Techniques";
+    xaxis label="Techniques";
+    yaxis label="(%)";
+run;
 
+proc sgplot data=work.survey_clean;
+    vbar Tools / stat=percent datalabel;
+    title "Learning Tools";
+    xaxis label="Tools";
+    yaxis label="(%)";
+run;
+
+/* ================================================================================= */
+/* STEP 4: PCA                                    */
+/* ================================================================================= */
+
+title "PCA";
+proc princomp data=work.survey_clean
+              out=pca_scores
+              plots= all;
+    var Q1_Explore Q2_need_learn Q3_syllabus
+        Q4_graphs Q5_AI Q6_discuss Q7_share;
+run;
+title;
