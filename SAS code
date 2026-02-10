@@ -100,6 +100,14 @@ run;
 /* ================================================================================= */
 /* STEP 3: GRAPHICS DESCRIPTIVE ANALYSIS                                      */
 /* ================================================================================= */
+/*Summary table*/
+proc tabulate data=work.survey_clean format=8.;
+    class gender age_group education_level current_situation;
+    table 
+        (gender age_group education_level current_situation), /* all categorical variables */
+        n='N' pctn='%'*f=6.2/ box='Sociodemographic characteristics'; /* columns */
+    title "Sociodemographic characteristics of respondents";
+run;
 
 title "Descriptive Analysis";
 proc freq data=work.survey_clean;
@@ -114,6 +122,7 @@ tables Tools / out=f_too;
 run;
 title;
 
+/* Bar chart Gender*/
 proc sgplot data=work.survey_clean;
     vbar gender / stat=percent datalabel;
     title "Gender";
@@ -121,6 +130,7 @@ proc sgplot data=work.survey_clean;
     yaxis label="(%)";
 run;
 
+/* Bar chart Age*/
 proc sgplot data=work.survey_clean;
     vbar age_group / stat=percent datalabel;
     title "Age group";
@@ -128,6 +138,7 @@ proc sgplot data=work.survey_clean;
     yaxis label="(%)";
 run;
 
+/* Bar chart Education level*/
 proc sgplot data=work.survey_clean;
     vbar education_level / stat=percent datalabel;
     title "Education level";
@@ -135,6 +146,7 @@ proc sgplot data=work.survey_clean;
     yaxis label="(%)";
 run;
 
+/* Bar chart Current situation*/
 proc sgplot data=work.survey_clean;
     vbar current_situation / stat=percent datalabel;
     title "Current situation";
@@ -142,20 +154,33 @@ proc sgplot data=work.survey_clean;
     yaxis label="(%)";
 run;
 
-proc sgplot data=work.survey_clean;
-    vbar study_time_pref / stat=percent datalabel;
+/*Bar chart Study time preferences*/
+proc freq data=work.survey_clean;
+    tables study_time_pref / out=f_stu_pre;
+run;
+proc sort data=f_stu_pre;
+    by percent;
+proc sgplot data=f_stu_pre;
+    vbar study_time_pref / response=percent stat=sum datalabel;
+    xaxis label="Hobby" discreteorder=data;
+    yaxis label="(%)";
     title "Study time preferences";
-    xaxis label="Time";
-    yaxis label="(%)";
-run;
+run;  
 
-proc sgplot data=work.survey_clean;
-    vbar hobby_short / stat=percent datalabel;
+/* Bar chart Hobby*/
+proc freq data=work.survey_clean;
+    tables hobby_short / out=f_hobby;
+run;
+proc sort data=f_hobby;
+    by percent;
+proc sgplot data=f_hobby;
+    vbar hobby_short / response=percent stat=sum datalabel;
+    xaxis label="Hobby" discreteorder=data;
+    yaxis label="(%)";
     title "Hobby preferences";
-    xaxis label="Hobby";
-    yaxis label="(%)";
-run;
-
+run;  
+    
+/* Bar chart Techniques*/
 proc sgplot data=work.survey_clean;
     vbar Techniques / stat=percent datalabel;
     title "Learning Techniques";
@@ -163,11 +188,105 @@ proc sgplot data=work.survey_clean;
     yaxis label="(%)";
 run;
 
+/* Bar chart Tools*/
 proc sgplot data=work.survey_clean;
     vbar Tools / stat=percent datalabel;
     title "Learning Tools";
     xaxis label="Tools";
     yaxis label="(%)";
+run;
+
+
+/*========Multiple choice questions=========*/
+/*Tools*/
+%let total_respondents = 42; /* total de personas que respondieron la encuesta */
+data tools_long;
+    set work.survey_clean;
+
+    array tool_vars[*] tool_ai tool_org tool_video tool_books tool_online;
+    length tool $20;
+
+    do i = 1 to dim(tool_vars);
+        tool = vname(tool_vars[i]);  /* nombre de la opción */
+        selected = tool_vars[i];     /* 0 o 1 */
+        output;
+    end;
+
+    keep tool selected;
+run;
+
+proc sql;
+    create table f_tools as
+    select tool, sum(selected) as count
+    from tools_long
+    group by tool;
+quit;
+
+data f_tools;
+    set f_tools;
+    percent = count / &total_respondents * 100;
+    format percent 6.2;
+run;
+
+proc sort data=f_tools;
+    by descending percent;
+run;
+
+proc sgplot data=f_tools;
+    vbar tool / response=percent datalabel;
+    xaxis label="Tools" discreteorder=data;
+    yaxis label="%" max=100;
+    title "Learning tools (percentage over total respondents)";
+run;
+
+/*Techniques*/
+
+data tech_long;
+    set work.survey_clean;
+
+    array tech_vars[*] tech_flash tech_lists tech_concept;
+    length tech $20;
+
+    do i = 1 to dim(tech_vars);
+        tech = vname(tech_vars[i]);  /* nombre de la opción */
+        selected = tech_vars[i];     /* 0 o 1 */
+        output;
+    end;
+
+    keep tech selected;
+run;
+
+proc sql;
+    create table f_tech as
+    select tech, sum(selected) as count
+    from tech_long
+    group by tech;
+quit;
+
+data f_tech;
+    set f_tech;
+    percent = count / &total_respondents * 100;
+    format percent 6.2;
+run;
+
+proc sort data=f_tech;
+    by descending percent;
+run;
+
+proc sgplot data=f_tech;
+    vbar tech / response=percent datalabel;
+    xaxis label="Techniques" discreteorder=data;
+    yaxis label="%" max=100;
+    title "Learning techniques (percentage over total respondents)";
+run;
+
+
+/* gráfica de barras */
+proc sgplot data=f_tools;
+    vbar tool / response=percent stat=sum datalabel;
+    xaxis label="Tools" discreteorder=data;
+    yaxis label="(%)";
+    title "Learning tools (multiple response)";
 run;
 
 /* ================================================================================= */
