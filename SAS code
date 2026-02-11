@@ -289,6 +289,28 @@ proc sgplot data=f_tools;
     title "Learning tools (multiple response)";
 run;
 
+/* gráfica de barras AI vs Education level*/
+proc sgplot data=work.survey_clean;
+    vbar education_level / group=tool_ai 
+                             stat=percent 
+                             groupdisplay=cluster
+                             datalabel;
+    xaxis label="Education level";
+    yaxis label="Percentage (%)";
+    title "Use of AI by education level";
+run;
+
+/* gráfica de barras AI vs Occupatioon*/
+proc sgplot data=work.survey_clean;
+    vbar current_situation/ group=tool_ai 
+                             stat=percent 
+                             groupdisplay=cluster
+                             datalabel;
+    xaxis label="Occupation";
+    yaxis label="Percentage (%)";
+    title "Use of AI by Occupation";
+run;
+
 /* ================================================================================= */
 /* STEP 4: PCA                                    */
 /* ================================================================================= */
