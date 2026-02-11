@@ -323,3 +323,116 @@ proc princomp data=work.survey_clean
         Q4_graphs Q5_AI Q6_discuss Q7_share;
 run;
 title;
+ 
+ 
+proc princomp data=work.survey_clean
+              out=work.pca_scores
+              n=3                /* retain first 3 components */
+              std;               /* standardize variables     */
+    var Q1_Explore 
+        Q2_need_learn 
+        Q3_syllabus 
+        Q4_graphs 
+        Q5_AI 
+        Q6_discuss 
+        Q7_share;
+run;
+
+
+ 
+ /* ================================================================================= */
+/* STEP 5: Cluster Analysis using PCA Scores                                        */
+/* ================================================================================= */
+
+title "Cluster Analysis";
+proc fastclus data=work.pca_scores
+              maxclusters=3
+              out=work.clustered
+              random=12345;
+    var Prin1 Prin2 Prin3;
+run;
+title;
+
+
+/* --------------------------------------------------------------- */
+/* STEP 6: Cluster Size Distribution                               */
+/* --------------------------------------------------------------- */
+/* Check how respondents are distributed across clusters           */
+
+proc freq data=work.clustered;
+    tables Cluster;
+    title "Cluster Size Distribution";
+run;
+
+
+/* --------------------------------------------------------------- */
+/* STEP 7: Cluster Profiling using PCA Scores                      */
+/* --------------------------------------------------------------- */
+/* Interpret clusters by comparing mean component scores            */
+
+proc means data=work.clustered mean;
+    class Cluster;
+    var Prin1 Prin2 Prin3;
+    title "Mean PCA Scores by Cluster";
+run;
+
+
+/* --------------------------------------------------------------- */
+/* STEP 8: Link Clusters to Learning Satisfaction (Optional)       */
+/* --------------------------------------------------------------- */
+/* Assess whether learner profiles differ in overall satisfaction  */
+
+proc means data=work.clustered mean std;
+    class Cluster;
+    var Q8_satisfaction;
+    title "Learning Satisfaction by Cluster";
+run;
+
+/* --------------------------------------------------------------- */
+/* STEP 6 (Optional): Cluster Visualization                        */
+/* --------------------------------------------------------------- */
+/* Visualize separation between clusters using first two PCs       */
+/* Include only ONE cluster plot in the report                     */
+
+proc sgplot data=work.clustered;
+    scatter x=Prin1 y=Prin2 / group=Cluster;
+    xaxis label="Principal Component 1";
+    yaxis label="Principal Component 2";
+    title "Cluster Plot Based on PCA Scores";
+run;
+
+/*Dendogram*/
+
+proc cluster data=work.pca_scores
+             method=ward
+             outtree=tree
+             standard
+             pseudo;
+    var Prin1 Prin2 Prin3;
+run;
+
+/*K-means*/
+/*proc fastclus data=work.pca_scores
+              maxclusters=3
+              out=work.kmeans_clusters
+              random=12345;
+    var Prin1 Prin2 Prin3;
+run;
+
+proc fastclus data=work.pca_scores
+              maxclusters=6
+              out=work.kmeans_clusters
+              random=12345;
+    var Prin1 Prin2 Prin3;
+    
+    
+proc fastclus data=work.pca_scores
+              maxclusters=2
+              out=work.kmeans_clusters
+              random=12345;
+    var Prin1 Prin2 Prin3;
+run;*/
+/* =============================================================== */
+/* END OF SCRIPT                                                   */
+/* =============================================================== */
+
