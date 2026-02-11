@@ -1,303 +1,106 @@
-/* ================================================================================= */
-/* STEP 1: IMPORT THE EXCEL FILE (RAW DATA)                                          */
-/* ================================================================================= */
+/* =============================================================== */
+/* FALLBACK SCRIPT: PCA + CLUSTERING ON LEARNING PREFERENCES       */
+/* Project: Statistics and Data Analysis                           */
+/* Purpose: Dimensionality reduction + learner profiling           */
+/* =============================================================== */
 
-*Import excel file;
-libname project xlsx "/home/u64439861/Survey responses/survey.xlsx";
-
-*Print first 5 rows of raw dataset;
-title "Learning preferences";
-proc sql outobs=5; 
-	select *
-	from project.survey;
-run;
-
-/* ================================================================================= */
-/* STEP 2: TRANSFORM AND STORE (CLEAN DATA)                                          */
-/* ================================================================================= */
-
-*Define format for Y/N questions;
-proc format;
-    value yn_fmt
-        1 = "Yes"
-        0 = "No";
-
-*New temporal dataset for cleaning data; 
-data work.survey_clean;
-    set project.survey;  
-**Remove columns;
-    drop Name 
-         Email
-         'Start time'n 
-         'Completion time'n
-         Other;
-**Rename columns;
-    rename 
-        'Studies last 2 years'n = studies_recent
-        'Age group'n           = age_group
-        'Level of studies'n     = education_level
-        'Current situation'n  = current_situation
-        'Study time'n           = study_time_pref;
-**Binary Encoding for Studies last 2 years question;
-    if 'Studies last 2 years'n = "Yes" then studies_binary = 1;
-    else studies_binary = 0;
-**Create dummy variables for Tools question;
-    tool_ai     = (index(Tools, "Artificial Intelligence") > 0);
-    tool_org    = (index(Tools, "Organization apps") > 0);
-    tool_video  = (index(Tools, "Video platforms") > 0);
-    tool_books  = (index(Tools, "Physical books") > 0);
-    tool_online = (index(Tools, "Online courses") > 0);
-**Create dummy variables for Techniques question;
-	tech_concept = (index(Techniques, "Concept maps") > 0);
-    tech_lists   = (index(Techniques, "Lists") > 0);
-    tech_flash   = (index(Techniques, "Flashcards") > 0);
-**Add Labels to dummy variables and likert questions;
-	label 
-	        tech_flash      = "Uses Flashcards"
-	        tech_lists      = "Uses Lists/Bullet points"
-	        tech_concept    = "Uses Concept maps"
-			tool_ai         = "Uses AI Tools (ChatGPT, etc.)"
-	        tool_org        = "Uses Organization Apps (Notion, Trello)"
-	        tool_books      = "Uses Physical books/paper notes"
-	        tool_online     = "Uses Online courses (Coursera/Udemy)"
-	        tool_video      = "Uses Video Platforms (YouTube, etc.)"
-	        Q1_Explore      = "I like to explore topics beyond the syllabus"
-	        Q2_need_learn   = "I only learn what is strictly necessary"
-	        Q3_syllabus     = "I follow a strict study plan/syllabus"
-	        Q4_graphs       = "I prefer using graphs and visual aids"
-	        Q5_AI           = "I use AI tools to assist my learning"
-	        Q6_discuss      = "I enjoy discussing topics with peers"
-	        Q7_share        = "I frequently share notes with others"
-	        Q8_satisfaction = "Overall satisfaction with current habits"
-	        studies_binary = "Studied in the last 2 years (Binary)";
-	        
-    length hobby_short $16;
-    select(hobby);
-        when("Creative Arts") hobby_short="Arts";
-        when("Physical Activity/Sports") hobby_short="Sports";
-        when("Reading") hobby_short="Reading";
-        when("Socializing/Volunteering") hobby_short="Social";
-        when ("Strategic Gaming (Board games, video games, or puzzles)") hobby_short="Gaming";
-        when("Technical/DIY Projects (coding, gaming, exploring new apps)") hobby_short="DIY";
-        otherwise hobby_short=hobby;
-    end;
-    
-/***Assign format to Y/N questions;
-    format studies_binary tool_ai tool_org tool_video tool_books tool_online 
-           tech_concept tech_lists tech_flash yn_fmt.;*/
-    
-run;
-
-/* Check the structure of the cleaned dataset */
-title "Cleaned Dataset Metadata";
-proc contents data=work.survey_clean;
-run;
-
-/*title "Final Cleaned Dataset (First 5 Rows)";*/
-proc print data=work.survey_clean(obs=5);
-run;
-
-/* ================================================================================= */
-/* STEP 3: GRAPHICS DESCRIPTIVE ANALYSIS                                      */
-/* ================================================================================= */
-/*Summary table*/
-proc tabulate data=work.survey_clean format=8.;
-    class gender age_group education_level current_situation;
-    table 
-        (gender age_group education_level current_situation), /* all categorical variables */
-        n='N' pctn='%'*f=6.2/ box='Sociodemographic characteristics'; /* columns */
-    title "Sociodemographic characteristics of respondents";
-run;
-
-title "Descriptive Analysis";
-proc freq data=work.survey_clean;
-tables gender / out=f_gender;
-tables age_group / out=f_age;
-tables education_level / out=f_edu;
-tables current_situation / out=f_sit;
-tables study_time_pref / out=f_stu_pref;
-tables Hobby / out=f_hobby;
-tables Techniques / out=f_tech;
-tables Tools / out=f_too;
-run;
-title;
-
-/* Bar chart Gender*/
-proc sgplot data=work.survey_clean;
-    vbar gender / stat=percent datalabel;
-    title "Gender";
-    xaxis label="Gender";
-    yaxis label="(%)";
-run;
-
-/* Bar chart Age*/
-proc sgplot data=work.survey_clean;
-    vbar age_group / stat=percent datalabel;
-    title "Age group";
-    xaxis label="Age";
-    yaxis label="(%)";
-run;
-
-/* Bar chart Education level*/
-proc sgplot data=work.survey_clean;
-    vbar education_level / stat=percent datalabel;
-    title "Education level";
-    xaxis label="Level";
-    yaxis label="(%)";
-run;
-
-/* Bar chart Current situation*/
-proc sgplot data=work.survey_clean;
-    vbar current_situation / stat=percent datalabel;
-    title "Current situation";
-    xaxis label="Situation";
-    yaxis label="(%)";
-run;
-
-/*Bar chart Study time preferences*/
-proc freq data=work.survey_clean;
-    tables study_time_pref / out=f_stu_pre;
-run;
-proc sort data=f_stu_pre;
-    by percent;
-proc sgplot data=f_stu_pre;
-    vbar study_time_pref / response=percent stat=sum datalabel;
-    xaxis label="Hobby" discreteorder=data;
-    yaxis label="(%)";
-    title "Study time preferences";
-run;  
-
-/* Bar chart Hobby*/
-proc freq data=work.survey_clean;
-    tables hobby_short / out=f_hobby;
-run;
-proc sort data=f_hobby;
-    by percent;
-proc sgplot data=f_hobby;
-    vbar hobby_short / response=percent stat=sum datalabel;
-    xaxis label="Hobby" discreteorder=data;
-    yaxis label="(%)";
-    title "Hobby preferences";
-run;  
-    
-/* Bar chart Techniques*/
-proc sgplot data=work.survey_clean;
-    vbar Techniques / stat=percent datalabel;
-    title "Learning Techniques";
-    xaxis label="Techniques";
-    yaxis label="(%)";
-run;
-
-/* Bar chart Tools*/
-proc sgplot data=work.survey_clean;
-    vbar Tools / stat=percent datalabel;
-    title "Learning Tools";
-    xaxis label="Tools";
-    yaxis label="(%)";
-run;
+/* --------------------------------------------------------------- */
+/* STEP 0: Assumptions                                             */
+/* --------------------------------------------------------------- */
+/* - Clean dataset already exists: work.survey_clean               */
+/* - Likert-scale variables are coded numerically (1–7)            */
+/* - Q8_satisfaction is excluded from PCA and used later           */
+/* --------------------------------------------------------------- */
 
 
-/*========Multiple choice questions=========*/
-/*Tools*/
-%let total_respondents = 42; /* total de personas que respondieron la encuesta */
-data tools_long;
-    set work.survey_clean;
+/* --------------------------------------------------------------- */
+/* STEP 1: Principal Component Analysis (PCA)                      */
+/* --------------------------------------------------------------- */
+/* Reduce 7 correlated learning-preference variables into           */
+/* a smaller set of uncorrelated components                         */
 
-    array tool_vars[*] tool_ai tool_org tool_video tool_books tool_online;
-    length tool $20;
-
-    do i = 1 to dim(tool_vars);
-        tool = vname(tool_vars[i]);  /* nombre de la opción */
-        selected = tool_vars[i];     /* 0 o 1 */
-        output;
-    end;
-
-    keep tool selected;
-run;
-
-proc sql;
-    create table f_tools as
-    select tool, sum(selected) as count
-    from tools_long
-    group by tool;
-quit;
-
-data f_tools;
-    set f_tools;
-    percent = count / &total_respondents * 100;
-    format percent 6.2;
-run;
-
-proc sort data=f_tools;
-    by descending percent;
-run;
-
-proc sgplot data=f_tools;
-    vbar tool / response=percent datalabel;
-    xaxis label="Tools" discreteorder=data;
-    yaxis label="%" max=100;
-    title "Learning tools (percentage over total respondents)";
-run;
-
-/*Techniques*/
-
-data tech_long;
-    set work.survey_clean;
-
-    array tech_vars[*] tech_flash tech_lists tech_concept;
-    length tech $20;
-
-    do i = 1 to dim(tech_vars);
-        tech = vname(tech_vars[i]);  /* nombre de la opción */
-        selected = tech_vars[i];     /* 0 o 1 */
-        output;
-    end;
-
-    keep tech selected;
-run;
-
-proc sql;
-    create table f_tech as
-    select tech, sum(selected) as count
-    from tech_long
-    group by tech;
-quit;
-
-data f_tech;
-    set f_tech;
-    percent = count / &total_respondents * 100;
-    format percent 6.2;
-run;
-
-proc sort data=f_tech;
-    by descending percent;
-run;
-
-proc sgplot data=f_tech;
-    vbar tech / response=percent datalabel;
-    xaxis label="Techniques" discreteorder=data;
-    yaxis label="%" max=100;
-    title "Learning techniques (percentage over total respondents)";
-run;
-
-
-/* gráfica de barras */
-proc sgplot data=f_tools;
-    vbar tool / response=percent stat=sum datalabel;
-    xaxis label="Tools" discreteorder=data;
-    yaxis label="(%)";
-    title "Learning tools (multiple response)";
-run;
-
-/* ================================================================================= */
-/* STEP 4: PCA                                    */
-/* ================================================================================= */
-
-title "PCA";
 proc princomp data=work.survey_clean
-              out=pca_scores
-              plots= all;
-    var Q1_Explore Q2_need_learn Q3_syllabus
-        Q4_graphs Q5_AI Q6_discuss Q7_share;
+              out=work.pca_scores
+              n=3                /* retain first 3 components */
+              std;               /* standardize variables     */
+    var Q1_Explore 
+        Q2_need_learn 
+        Q3_syllabus 
+        Q4_graphs 
+        Q5_AI 
+        Q6_discuss 
+        Q7_share;
 run;
-title;
+
+/* Output dataset: work.pca_scores */
+/* New variables created: Prin1, Prin2, Prin3 */
+
+
+/* --------------------------------------------------------------- */
+/* STEP 2: Cluster Analysis using PCA Scores                       */
+/* --------------------------------------------------------------- */
+/* Cluster individuals based on underlying learning dimensions     */
+/* FASTCLUS is appropriate for continuous component scores         */
+
+proc fastclus data=work.pca_scores
+              maxclusters=3      /* number of clusters */
+              out=work.clustered
+              seed=12345;        /* ensures reproducibility */
+    var Prin1 Prin2 Prin3;
+run;
+
+/* Output dataset: work.clustered */
+/* Cluster assignment variable: Cluster */
+
+
+/* --------------------------------------------------------------- */
+/* STEP 3: Cluster Size Distribution                               */
+/* --------------------------------------------------------------- */
+/* Check how respondents are distributed across clusters           */
+
+proc freq data=work.clustered;
+    tables Cluster;
+    title "Cluster Size Distribution";
+run;
+
+
+/* --------------------------------------------------------------- */
+/* STEP 4: Cluster Profiling using PCA Scores                      */
+/* --------------------------------------------------------------- */
+/* Interpret clusters by comparing mean component scores            */
+
+proc means data=work.clustered mean;
+    class Cluster;
+    var Prin1 Prin2 Prin3;
+    title "Mean PCA Scores by Cluster";
+run;
+
+
+/* --------------------------------------------------------------- */
+/* STEP 5: Link Clusters to Learning Satisfaction (Optional)       */
+/* --------------------------------------------------------------- */
+/* Assess whether learner profiles differ in overall satisfaction  */
+
+proc means data=work.clustered mean std;
+    class Cluster;
+    var Q8_satisfaction;
+    title "Learning Satisfaction by Cluster";
+run;
+
+
+/* --------------------------------------------------------------- */
+/* STEP 6 (Optional): Cluster Visualization                        */
+/* --------------------------------------------------------------- */
+/* Visualize separation between clusters using first two PCs       */
+/* Include only ONE cluster plot in the report                     */
+
+proc sgplot data=work.clustered;
+    scatter x=Prin1 y=Prin2 / group=Cluster;
+    xaxis label="Principal Component 1";
+    yaxis label="Principal Component 2";
+    title "Cluster Plot Based on PCA Scores";
+run;
+
+/* =============================================================== */
+/* END OF SCRIPT                                                   */
+/* =============================================================== */
