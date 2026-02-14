@@ -281,7 +281,7 @@ proc sgplot data=f_tech;
 run;
 
 
-/* gráfica de barras */
+
 proc sgplot data=f_tools;
     vbar tool / response=percent stat=sum datalabel;
     xaxis label="Tools" discreteorder=data;
@@ -289,7 +289,7 @@ proc sgplot data=f_tools;
     title "Learning tools (multiple response)";
 run;
 
-/* gráfica de barras AI vs Education level*/
+
 proc sgplot data=work.survey_clean;
     vbar education_level / group=tool_ai 
                              stat=percent 
@@ -300,7 +300,7 @@ proc sgplot data=work.survey_clean;
     title "Use of AI by education level";
 run;
 
-/* gráfica de barras AI vs Occupatioon*/
+
 proc sgplot data=work.survey_clean;
     vbar current_situation/ group=tool_ai 
                              stat=percent 
@@ -314,125 +314,153 @@ run;
 /* ================================================================================= */
 /* STEP 4: PCA                                    */
 /* ================================================================================= */
-
 title "PCA";
-proc princomp data=work.survey_clean
-              out=pca_scores
-              plots= all;
-    var Q1_Explore Q2_need_learn Q3_syllabus
+proc corr data=work.survey_clean;
+    var Q1_Explore Q2_need_learn Q3_syllabus 
         Q4_graphs Q5_AI Q6_discuss Q7_share;
 run;
 title;
- 
- 
-proc princomp data=work.survey_clean
-              out=work.pca_scores
-              n=3                /* retain first 3 components */
-              std;               /* standardize variables     */
-    var Q1_Explore 
-        Q2_need_learn 
-        Q3_syllabus 
-        Q4_graphs 
-        Q5_AI 
-        Q6_discuss 
-        Q7_share;
+proc princomp data=work.survey_clean out=work.coord;
+    var Q1_Explore Q2_need_learn Q3_syllabus 
+        Q4_graphs Q5_AI Q6_discuss Q7_share;
+run;
+
+proc corr data=work.coord;
+var prin:;
 run;
 
 
- 
- /* ================================================================================= */
-/* STEP 5: Cluster Analysis using PCA Scores                                        */
-/* ================================================================================= */
+data work.check_se; /*check source of the size effect*/
+    set work.coord;
 
-title "Cluster Analysis";
-proc fastclus data=work.pca_scores
-              maxclusters=3
-              out=work.clustered
-              random=12345;
-    var Prin1 Prin2 Prin3;
-run;
-title;
+    avgi = mean(of Q1_Explore Q2_need_learn Q3_syllabus 
+                Q4_graphs Q5_AI Q6_discuss Q7_share);
 
+    mini = min(of Q1_Explore Q2_need_learn Q3_syllabus 
+               Q4_graphs Q5_AI Q6_discuss Q7_share);
 
-/* --------------------------------------------------------------- */
-/* STEP 6: Cluster Size Distribution                               */
-/* --------------------------------------------------------------- */
-/* Check how respondents are distributed across clusters           */
-
-proc freq data=work.clustered;
-    tables Cluster;
-    title "Cluster Size Distribution";
+    maxi = max(of Q1_Explore Q2_need_learn Q3_syllabus 
+               Q4_graphs Q5_AI Q6_discuss Q7_share);
 run;
 
 
-/* --------------------------------------------------------------- */
-/* STEP 7: Cluster Profiling using PCA Scores                      */
-/* --------------------------------------------------------------- */
-/* Interpret clusters by comparing mean component scores            */
+proc corr data=work.check_se;
+var avgi prin1 prin2 prin3; /*check if the position of points in the projection is related only with the average perception of the scale or not*/
+run;
 
-proc means data=work.clustered mean;
-    class Cluster;
-    var Prin1 Prin2 Prin3;
-    title "Mean PCA Scores by Cluster";
+*now use sz as prefix for step no-biased;
+data work.sz_survey_clean; set work.survey_clean;
+avgi=mean(of Q1_Explore Q2_need_learn Q3_syllabus 
+               Q4_graphs Q5_AI Q6_discuss Q7_share);
+mini=min(of Q1_Explore Q2_need_learn Q3_syllabus 
+               Q4_graphs Q5_AI Q6_discuss Q7_share);
+maxi=max(of Q1_Explore Q2_need_learn Q3_syllabus 
+               Q4_graphs Q5_AI Q6_discuss Q7_share);
+array a Q1_Explore Q2_need_learn Q3_syllabus 
+               Q4_graphs Q5_AI Q6_discuss Q7_share;
+array b new1-new7;
+do over b;
+if a>avgi then b=(a-avgi)/(maxi-avgi);
+if a<avgi then b=(a-avgi)/(avgi-mini);
+if a=avgi then b=0;
+if a=. then b=0;
+end;
+label new1='Explore';
+label new2='need_learn';
+label new3='syllabus';
+label new4='graphs';
+label new5='AI';
+label new6='discuss';
+label new7='share';
+run;
+
+proc means data=work.sz_survey_clean;
+var new1-new7;
+run;
+
+proc princomp data=work.sz_survey_clean out=work.sz_coord;
+var new1-new7;
 run;
 
 
-/* --------------------------------------------------------------- */
-/* STEP 8: Link Clusters to Learning Satisfaction (Optional)       */
-/* --------------------------------------------------------------- */
-/* Assess whether learner profiles differ in overall satisfaction  */
-
-proc means data=work.clustered mean std;
-    class Cluster;
-    var Q8_satisfaction;
-    title "Learning Satisfaction by Cluster";
+proc cluster data=work.sz_coord method=ward out=work.sz_tree;
+var prin1-prin4;
+id id;
 run;
 
-/* --------------------------------------------------------------- */
-/* STEP 6 (Optional): Cluster Visualization                        */
-/* --------------------------------------------------------------- */
-/* Visualize separation between clusters using first two PCs       */
-/* Include only ONE cluster plot in the report                     */
-
-proc sgplot data=work.clustered;
-    scatter x=Prin1 y=Prin2 / group=Cluster;
-    xaxis label="Principal Component 1";
-    yaxis label="Principal Component 2";
-    title "Cluster Plot Based on PCA Scores";
+proc tree data=work.sz_tree; /*generate dendogram*/
 run;
 
-/*Dendogram*/
 
-proc cluster data=work.pca_scores
-             method=ward
-             outtree=tree
-             standard
-             pseudo;
-    var Prin1 Prin2 Prin3;
+proc tree data=work.sz_tree noprint out=work.sz_cluster nclusters=4; /*correspondence between unit and cluster*/
+id id;
 run;
 
-/*K-means*/
-/*proc fastclus data=work.pca_scores
-              maxclusters=3
-              out=work.kmeans_clusters
-              random=12345;
-    var Prin1 Prin2 Prin3;
+
+proc freq data=work.sz_cluster;
+table cluster;	/*how many customers stay in each cluster*/
 run;
 
-proc fastclus data=work.pca_scores
-              maxclusters=6
-              out=work.kmeans_clusters
-              random=12345;
-    var Prin1 Prin2 Prin3;
-    
-    
-proc fastclus data=work.pca_scores
-              maxclusters=2
-              out=work.kmeans_clusters
-              random=12345;
-    var Prin1 Prin2 Prin3;
-run;*/
-/* =============================================================== */
-/* END OF SCRIPT                                                   */
-/* =============================================================== */
+proc sort data=work.sz_cluster;
+by id;
+run;
+
+data work.sz_survey_clean_1;
+merge work.sz_survey_clean work.sz_cluster;
+by id;
+run;
+
+/*the fake dataset*/
+data work.sz_survey_clean_fake;
+set work.sz_survey_clean_1;
+if cluster ne . then cluster=5;/*creates a fake cluster 5 that represents the total population*/
+run;
+
+
+data work.sz_survey_clean_long; /*duplicate amount of points in dataset?*/
+set work.sz_survey_clean_1 work.sz_survey_clean_fake; /*append fake dataset to original dataset*/
+run;
+
+/*macro to produce 4 analysis of our 4 clusters*/
+%macro do_k_cluster;
+%do k=1 %to 4;
+proc ttest data=work.sz_survey_clean_long;
+where cluster=&k or cluster=5; /*number of cluster is the name of the parameter, k changes from 1 to 4 in each cycle*/
+class cluster;
+var new:;
+ods output ttests=work.cl_ttest_&k (where=(method='Satterthwaite') rename=(tvalue=tvalue_&k) rename=(probt=prob_&k));
+;
+run;
+%end;
+
+%mend do_k_cluster;
+%do_k_cluster;
+
+proc print data=work.cl_ttest_4;/*p-value is the probability of the null hypothesis of the t-test(average of cluster is the same as average of sample) - should be very small or 0 */
+run; /*only new7 has a very high p-value, stating that new7 is not significant, it does not have a negative or positive impact*/
+
+data work.ttest_all; /*generate dataset over all clusters*/
+merge work.cl_ttest_1 work.cl_ttest_2 work.cl_ttest_3 work.cl_ttest_4; /*merge all tables for all clusters to generate a compact table*/
+by variable;
+run;
+
+
+proc print data=work.ttest_all;
+run;
+
+data work.labels;
+input variable $ label $ 75.; /*symbol $ means content is a character, not a number*/
+cards;
+new1 Q1_Explore
+new2 Q2_need_learn
+new3 Q3_syllabus
+new4 Q4_graphs
+new5 Q5_AI
+new6 Q6_discuss
+new7 Q7_share
+run;
+
+data work.ttest_all_1;
+merge work.ttest_all work.labels;
+run;
 
